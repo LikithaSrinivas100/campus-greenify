@@ -1,11 +1,6 @@
-"""
-CampusGreenify – Smart Planner for Eco-Campus
-Main Streamlit Application
-"""
-
+"""CampusGreenify – Smart Planner for Eco-Campus"""
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
 import os
 from engine.recommendations import generate_recommendations
 from engine.impact import calculate_impact_metrics
@@ -13,571 +8,325 @@ from engine.chatbot import process_chat_message
 from engine.report import generate_pdf_report
 from styles.theme import get_custom_css
 
-# ============================================================
-# PAGE CONFIG
-# ============================================================
-st.set_page_config(
-    page_title="CampusGreenify – Smart Planner for Eco-Campus",
-    page_icon="🌿",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-# Inject custom CSS
+st.set_page_config(page_title="CampusGreenify", page_icon="🌿", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(get_custom_css(), unsafe_allow_html=True)
 
-# ============================================================
-# SESSION STATE INIT
-# ============================================================
-if "current_step" not in st.session_state:
-    st.session_state.current_step = 0
-if "campus_profile" not in st.session_state:
-    st.session_state.campus_profile = {}
-if "priorities" not in st.session_state:
-    st.session_state.priorities = []
-if "recommendations" not in st.session_state:
-    st.session_state.recommendations = []
-if "sustainability_score" not in st.session_state:
-    st.session_state.sustainability_score = 0
-if "problem_areas" not in st.session_state:
-    st.session_state.problem_areas = []
-if "impact_metrics" not in st.session_state:
-    st.session_state.impact_metrics = {}
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+for k, d in [("current_step",0),("campus_profile",{}),("priorities",[]),("recommendations",[]),
+             ("sustainability_score",0),("problem_areas",[]),("impact_metrics",{}),("chat_history",[])]:
+    if k not in st.session_state: st.session_state[k] = d
 
+def go_to(s): st.session_state.current_step = s
 
-def go_to_step(step):
-    st.session_state.current_step = step
-
-
-# ============================================================
-# LOGO HELPER
-# ============================================================
-def render_logo():
+def nav():
     logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+    logo_html = ""
     if os.path.exists(logo_path):
-        return logo_path
-    return None
+        import base64
+        with open(logo_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        logo_html = f'<img src="data:image/png;base64,{b64}" style="height:32px;border-radius:8px;">'
+    st.markdown(f"""
+    <div class="top-nav">
+      <div class="nav-brand">
+        {logo_html}
+        <span class="nav-brand-name">CampusGreenify</span>
+        <span class="nav-brand-badge">MVP</span>
+      </div>
+      <span class="nav-tagline">🌿 AI-Powered Sustainability Intelligence</span>
+    </div>""", unsafe_allow_html=True)
 
-
-# ============================================================
-# PROGRESS BAR
-# ============================================================
-def render_progress_bar(current):
-    steps = ["Campus Input", "Personalize", "AI Dashboard", "Impact Analysis", "Report"]
-    html = '<div class="progress-container">'
-    for i, label in enumerate(steps):
-        step_num = i + 1
-        if step_num < current:
-            circle_class = "completed"
-        elif step_num == current:
-            circle_class = "active"
-        else:
-            circle_class = "inactive"
-        html += f'<div class="progress-step"><div class="step-circle {circle_class}">{step_num}</div><div class="step-label">{label}</div></div>'
-        if i < len(steps) - 1:
-            line_class = "completed" if step_num < current else "inactive"
-            html += f'<div class="step-line {line_class}"></div>'
-    html += '</div>'
+def progress(cur):
+    steps = ["Campus","Personalize","Dashboard","Impact","Report"]
+    html = '<div class="progress-wrapper"><div class="progress-container">'
+    for i, lbl in enumerate(steps):
+        n = i+1
+        cls = "active" if n==cur else ("completed" if n<cur else "inactive")
+        lcls = "active-label" if n==cur else ""
+        icon = "✓" if n<cur else str(n)
+        html += f'<div class="progress-step"><div class="step-circle {cls}">{icon}</div><div class="step-label {lcls}">{lbl}</div></div>'
+        if i < len(steps)-1:
+            lc = "completed" if n<cur else "inactive"
+            html += f'<div class="step-line {lc}"></div>'
+    html += '</div></div>'
     st.markdown(html, unsafe_allow_html=True)
 
-
-# ============================================================
-# STEP 0: LANDING PAGE
-# ============================================================
 def render_landing():
-    logo = render_logo()
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    with col_c:
-        if logo:
-            st.image(logo, width=120)
-
+    nav()
     st.markdown("""
-    <div class="hero-banner">
-        <h1>CampusGreenify</h1>
-        <p>AI-Powered Sustainability Intelligence for Campuses.<br/>
-        Make smarter sustainability decisions with data-driven insights, personalized recommendations, and actionable reports.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    <div class="hero-banner anim-up">
+      <div class="hero-badge">✦ AI-Powered Platform</div>
+      <h1>CampusGreenify</h1>
+      <p>Transform your campus into an eco-smart hub. Get personalized AI recommendations,<br>projected savings, and a downloadable sustainability roadmap — in minutes.</p>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="hero-stat-value">10+</div><div class="hero-stat-label">Green Solutions</div></div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><div class="hero-stat-value">₹870K</div><div class="hero-stat-label">Avg Annual Savings</div></div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><div class="hero-stat-value">65%</div><div class="hero-stat-label">Energy Reduction</div></div>
+      </div>
+    </div>""", unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">📊</div>
-            <h3>Data-Driven Analysis</h3>
-            <p>Input your campus data and get AI-powered sustainability scoring with identified problem areas.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">🤖</div>
-            <h3>AI Recommendations</h3>
-            <p>Get personalized sustainability solutions ranked by impact, ROI, and feasibility for your campus.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">📄</div>
-            <h3>Actionable Reports</h3>
-            <p>Download comprehensive PDF reports with action plans, timelines, and projected savings.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    with col_b:
-        if st.button("🚀  Get Started", type="primary", use_container_width=True, key="get_started"):
-            go_to_step(1)
-            st.rerun()
-
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align:center; color: #5A6070; font-size: 0.85rem;">
-        <strong>Trusted by campuses</strong> looking to reduce costs, cut emissions, and build a sustainable future.<br/>
-        CampusGreenify — Where sustainability meets intelligence.
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ============================================================
-# STEP 1: CAMPUS INPUT FORM
-# ============================================================
-def render_step1():
-    render_progress_bar(1)
-    st.markdown('<div class="section-header">📋 Tell us about your campus</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subheader">We need just a few details to generate your personalized sustainability plan.</div>', unsafe_allow_html=True)
-
-    with st.container():
-        col1, col2 = st.columns(2)
-        with col1:
-            campus_name = st.text_input("Campus Name *", placeholder="e.g., Green Valley University", key="inp_name")
-            campus_type = st.selectbox("Campus Type *", ["University", "College", "School", "Corporate Campus", "Government"], key="inp_type")
-            location = st.selectbox("Location / Climate Zone *", ["Tropical", "Arid", "Temperate", "Continental", "Coastal"], key="inp_loc")
-        with col2:
-            campus_size = st.selectbox("Campus Size *", ["Small (< 5 acres)", "Medium (5–20 acres)", "Large (20–50 acres)", "Very Large (> 50 acres)"], key="inp_size")
-            main_goal = st.selectbox("Main Sustainability Goal *", ["Reduce Energy Costs", "Water Conservation", "Carbon Neutrality", "Waste Reduction", "Overall Sustainability"], key="inp_goal")
-            electricity_bill = st.number_input("Annual Electricity Bill ₹ (Optional)", min_value=0, value=0, step=50000, key="inp_bill", help="Helps us estimate savings more accurately")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    with col_a:
-        if st.button("← Back", key="back_1", use_container_width=True):
-            go_to_step(0)
-            st.rerun()
-    with col_c:
-        if st.button("Next →", type="primary", key="next_1", use_container_width=True):
-            if not campus_name.strip():
-                st.error("Please enter a campus name.")
-            else:
-                st.session_state.campus_profile = {
-                    "name": campus_name.strip(),
-                    "type": campus_type.lower().replace(" ", "_"),
-                    "location": location.lower(),
-                    "size": campus_size,
-                    "main_goal": main_goal,
-                    "electricity_bill": electricity_bill if electricity_bill > 0 else 0,
-                }
-                go_to_step(2)
-                st.rerun()
-
-
-# ============================================================
-# STEP 2: PERSONALIZE
-# ============================================================
-def render_step2():
-    render_progress_bar(2)
-    st.markdown('<div class="section-header">🎯 What matters most to your campus?</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subheader">Select your top priorities to get tailored recommendations. You can skip this step.</div>', unsafe_allow_html=True)
-
-    priorities_options = [
-        ("🔌", "Reduce Electricity Cost"),
-        ("💧", "Reduce Water Wastage"),
-        ("📊", "Improve Sustainability Score"),
-        ("✅", "Compliance Readiness"),
-        ("🌍", "Reduce Carbon Footprint"),
+    c1,c2,c3 = st.columns(3)
+    cards = [
+        ("📊","Data-Driven Analysis","Input campus profile → get AI sustainability scoring with identified problem areas.","anim-d1"),
+        ("🤖","Smart Recommendations","10 solutions ranked by Impact, ROI & Feasibility tailored to your campus.","anim-d2"),
+        ("📄","PDF Action Report","Download a professional sustainability roadmap with phased action plans.","anim-d3"),
     ]
-
-    selected = st.multiselect(
-        "Select your priorities (choose one or more):",
-        [f"{icon} {label}" for icon, label in priorities_options],
-        key="priority_select",
-        default=st.session_state.priorities if st.session_state.priorities else [],
-    )
+    for col, (icon, title, desc, delay) in zip([c1,c2,c3], cards):
+        with col:
+            st.markdown(f"""
+            <div class="feature-card anim-up {delay}">
+              <div class="feature-icon-wrap">{icon}</div>
+              <h3>{title}</h3>
+              <p>{desc}</p>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    with col_a:
-        if st.button("← Back", key="back_2", use_container_width=True):
-            go_to_step(1)
-            st.rerun()
-    with col_b:
-        if st.button("Skip →", key="skip_2", use_container_width=True):
-            st.session_state.priorities = []
-            _generate_results()
-            go_to_step(3)
-            st.rerun()
-    with col_c:
-        if st.button("Next →", type="primary", key="next_2", use_container_width=True):
-            st.session_state.priorities = selected
-            _generate_results()
-            go_to_step(3)
-            st.rerun()
+    _, cb, _ = st.columns([1.5,1,1.5])
+    with cb:
+        if st.button("🚀  Get Started — It's Free", type="primary", use_container_width=True, key="gs"):
+            go_to(1); st.rerun()
+    st.markdown('<div class="app-footer">Made with 💚 by Team CampusGreenify · <strong>Sustainability Intelligence Platform</strong></div>', unsafe_allow_html=True)
 
+def render_step1():
+    nav(); progress(1)
+    st.markdown('<div class="page-header"><div class="green-line"></div><h2>📋 Tell us about your campus</h2><p>Just a few details to generate your personalized sustainability roadmap.</p></div>', unsafe_allow_html=True)
+    with st.container():
+        c1,c2 = st.columns(2)
+        with c1:
+            name = st.text_input("Campus Name *", placeholder="e.g. Green Valley University", key="n")
+            ctype = st.selectbox("Campus Type *", ["University","College","School","Corporate Campus","Government"], key="t")
+            loc = st.selectbox("Climate Zone *", ["Tropical","Arid","Temperate","Continental","Coastal"], key="l")
+        with c2:
+            size = st.selectbox("Campus Size *", ["Small (< 5 acres)","Medium (5–20 acres)","Large (20–50 acres)","Very Large (> 50 acres)"], key="s")
+            goal = st.selectbox("Main Goal *", ["Reduce Energy Costs","Water Conservation","Carbon Neutrality","Waste Reduction","Overall Sustainability"], key="g")
+            bill = st.number_input("Annual Electricity Bill ₹ (Optional)", min_value=0, value=0, step=50000, key="b")
+    st.markdown("<br>", unsafe_allow_html=True)
+    ca,_,cc = st.columns(3)
+    with ca:
+        if st.button("← Back", key="b1", use_container_width=True): go_to(0); st.rerun()
+    with cc:
+        if st.button("Next: Set Priorities →", type="primary", key="n1", use_container_width=True):
+            if not name.strip(): st.error("Please enter your campus name.")
+            else:
+                st.session_state.campus_profile = {"name":name.strip(),"type":ctype.lower().replace(" ","_"),"location":loc.lower(),"size":size,"main_goal":goal,"electricity_bill":bill if bill>0 else 0}
+                go_to(2); st.rerun()
 
-def _generate_results():
-    """Run recommendation engine and impact calculations."""
-    recs, score, problems = generate_recommendations(
-        st.session_state.campus_profile,
-        st.session_state.priorities,
-    )
-    st.session_state.recommendations = recs
-    st.session_state.sustainability_score = score
-    st.session_state.problem_areas = problems
-    st.session_state.impact_metrics = calculate_impact_metrics(
-        recs, st.session_state.campus_profile
-    )
+def render_step2():
+    nav(); progress(2)
+    st.markdown('<div class="page-header"><div class="green-line"></div><h2>🎯 What matters most to your campus?</h2><p>Select priorities to fine-tune your AI recommendations (or skip to use defaults).</p></div>', unsafe_allow_html=True)
+    opts = ["🔌 Reduce Electricity Cost","💧 Reduce Water Wastage","📊 Improve Sustainability Score","✅ Compliance Readiness","🌍 Reduce Carbon Footprint"]
+    sel = st.multiselect("Select your top priorities:", opts, key="ps", default=st.session_state.priorities or [])
+    st.markdown("<br>", unsafe_allow_html=True)
+    ca,cb,cc = st.columns(3)
+    with ca:
+        if st.button("← Back", key="b2", use_container_width=True): go_to(1); st.rerun()
+    with cb:
+        if st.button("Skip →", key="sk2", use_container_width=True):
+            st.session_state.priorities=[]; _gen(); go_to(3); st.rerun()
+    with cc:
+        if st.button("Analyse My Campus →", type="primary", key="n2", use_container_width=True):
+            st.session_state.priorities=sel; _gen(); go_to(3); st.rerun()
 
+def _gen():
+    r,s,p = generate_recommendations(st.session_state.campus_profile, st.session_state.priorities)
+    st.session_state.recommendations=r; st.session_state.sustainability_score=s; st.session_state.problem_areas=p
+    st.session_state.impact_metrics = calculate_impact_metrics(r, st.session_state.campus_profile)
 
-# ============================================================
-# STEP 3: AI DASHBOARD
-# ============================================================
 def render_step3():
-    render_progress_bar(3)
-    st.markdown('<div class="section-header">📊 AI Sustainability Dashboard</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="section-subheader">Personalized analysis for {st.session_state.campus_profile.get("name", "your campus")}</div>', unsafe_allow_html=True)
-
+    nav(); progress(3)
     score = st.session_state.sustainability_score
-    if score >= 70:
-        score_class, score_text = "score-excellent", "Excellent"
-    elif score >= 55:
-        score_class, score_text = "score-good", "Good"
-    elif score >= 40:
-        score_class, score_text = "score-moderate", "Moderate"
-    else:
-        score_class, score_text = "score-poor", "Needs Improvement"
+    name = st.session_state.campus_profile.get("name","Your Campus")
+    st.markdown(f'<div class="page-header"><div class="green-line"></div><h2>📊 AI Dashboard – {name}</h2><p>Your personalised sustainability analysis is ready.</p></div>', unsafe_allow_html=True)
 
-    # Score + Problem Areas row
-    col_score, col_problems = st.columns([1, 2])
+    if score>=70: status,sc="Excellent 🌟","score-excellent"
+    elif score>=55: status,sc="Good 👍","score-good"
+    elif score>=40: status,sc="Moderate ⚠️","score-moderate"
+    else: status,sc="Needs Work 🔴","score-poor"
 
-    with col_score:
+    col_s, col_p = st.columns([1,2])
+    with col_s:
         st.markdown(f"""
-        <div class="custom-card" style="text-align:center; padding:2rem;">
-            <div class="score-label">SUSTAINABILITY SCORE</div>
-            <div class="score-value {score_class}">{score}</div>
-            <div class="score-label" style="font-size:1.1rem; font-weight:600;">{score_text}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        <div class="score-card anim-up">
+          <div class="score-title">SUSTAINABILITY SCORE</div>
+          <div class="score-number">{score}</div>
+          <div class="score-status">{status}</div>
+          <div class="score-bar-wrap"><div class="score-bar" style="width:{score}%"></div></div>
+          <div style="font-size:0.78rem;color:rgba(255,255,255,0.6);margin-top:4px;">{score}/100 overall rating</div>
+        </div>""", unsafe_allow_html=True)
 
-        # Gauge chart
-        fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=score,
-            domain={'x': [0, 1], 'y': [0, 1]},
-            gauge={
-                'axis': {'range': [0, 100], 'tickwidth': 1},
-                'bar': {'color': "#2E7D32"},
-                'steps': [
-                    {'range': [0, 40], 'color': "#FFCDD2"},
-                    {'range': [40, 55], 'color': "#FFE0B2"},
-                    {'range': [55, 70], 'color': "#FFF9C4"},
-                    {'range': [70, 100], 'color': "#C8E6C9"},
-                ],
-                'threshold': {'line': {'color': "#1B5E20", 'width': 4}, 'thickness': 0.8, 'value': score},
-            },
-        ))
-        fig.update_layout(height=220, margin=dict(l=20, r=20, t=20, b=20), font={'family': 'Inter'})
+        fig = go.Figure(go.Indicator(mode="gauge+number", value=score, domain={'x':[0,1],'y':[0,1]},
+            gauge={'axis':{'range':[0,100],'tickwidth':1},'bar':{'color':'#22c55e'},
+                   'steps':[{'range':[0,40],'color':'#fee2e2'},{'range':[40,55],'color':'#fef3c7'},
+                             {'range':[55,70],'color':'#dcfce7'},{'range':[70,100],'color':'#bbf7d0'}],
+                   'threshold':{'line':{'color':'#14532d','width':3},'thickness':0.8,'value':score}}))
+        fig.update_layout(height=200, margin=dict(l=20,r=20,t=10,b=10), font={'family':'Inter'})
         st.plotly_chart(fig, use_container_width=True)
 
-    with col_problems:
-        st.markdown("**🔍 Problem Areas**")
-        prob_cols = st.columns(2)
-        for i, area in enumerate(st.session_state.problem_areas):
-            with prob_cols[i % 2]:
-                if area["status"] == "critical":
-                    css_class = "problem-critical"
-                elif area["status"] == "moderate":
-                    css_class = "problem-moderate"
-                else:
-                    css_class = "problem-good"
+    with col_p:
+        st.markdown("**🔍 Campus Problem Areas**")
+        pc1,pc2 = st.columns(2)
+        for i,area in enumerate(st.session_state.problem_areas):
+            with (pc1 if i%2==0 else pc2):
+                css = {"critical":"problem-critical","moderate":"problem-moderate","good":"problem-good"}[area["status"]]
+                badge_css = {"critical":"badge-crit","moderate":"badge-mod","good":"badge-good"}[area["status"]]
+                parts = area['label'].split(' ',1)
+                emoji,lbl = (parts[0],parts[1]) if len(parts)>1 else ("",parts[0])
                 st.markdown(f"""
-                <div class="problem-card {css_class}" style="margin-bottom:0.75rem;">
-                    <div style="font-size:1.3rem;">{area['label'].split(' ')[0]}</div>
-                    <div>{area['label'].split(' ', 1)[1] if ' ' in area['label'] else area['label']}</div>
-                    <div style="font-size:0.8rem; margin-top:4px;">{area['status_label']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                <div class="problem-card {css}">
+                  <div class="problem-emoji">{emoji}</div>
+                  <div class="problem-name">{lbl}</div>
+                  <span class="problem-badge {badge_css}">{area['status_label']}</span>
+                </div>""", unsafe_allow_html=True)
 
     st.markdown('<div class="green-divider"></div>', unsafe_allow_html=True)
-
-    # Recommendations
-    st.markdown("**🎯 Smart Recommendations**")
-    st.markdown('<div class="section-subheader">Ranked by impact, ROI, and alignment with your goals</div>', unsafe_allow_html=True)
-
-    for rec in st.session_state.recommendations[:6]:
-        with st.expander(f"{rec['title']}  —  {rec.get('priority', '')}"):
-            c1, c2 = st.columns([2, 1])
+    st.markdown("**🎯 Smart Recommendations** — Ranked by AI scoring")
+    for i,rec in enumerate(st.session_state.recommendations[:6]):
+        bc = {"High Priority":"badge-high","Medium Priority":"badge-medium"}.get(rec.get("priority",""),"badge-low")
+        with st.expander(f"#{i+1}  {rec['title']}"):
+            c1,c2 = st.columns([2,1])
             with c1:
                 st.write(rec["description"])
                 st.markdown("**Implementation Steps:**")
-                for step in rec.get("implementation_steps", []):
-                    st.markdown(f"- {step}")
+                for step in rec.get("implementation_steps",[]): st.markdown(f"- {step}")
+                st.markdown(f'**Benefits:** {" · ".join(rec.get("benefits",[])[:3])}')
             with c2:
-                st.metric("Payback Period", f"{rec['payback_years']} years")
-                st.metric("Investment", rec["cost_range"])
-                st.metric("Energy Savings", f"{rec['savings_percent']}%")
-                st.metric("CO₂ Reduction", f"{rec['co2_reduction']}%")
-                if rec["water_savings"] > 0:
-                    st.metric("Water Savings", f"{rec['water_savings']}%")
+                st.metric("Payback",f"{rec['payback_years']} yrs")
+                st.metric("Investment",rec["cost_range"])
+                st.metric("Energy Savings",f"{rec['savings_percent']}%")
+                st.metric("CO₂ Cut",f"{rec['co2_reduction']}%")
 
     st.markdown('<div class="green-divider"></div>', unsafe_allow_html=True)
-
-    # AI Chatbot
     st.markdown("**🤖 AI Sustainability Assistant**")
-    st.markdown("Ask me about any recommendation — *Why?* *ROI?* *Benefits?* *How to implement?*")
-
-    # Display chat history
+    st.markdown('<div class="chat-hint">💬 Ask me: <em>"Why solar panels?"</em> · <em>"What is the ROI of LED?"</em> · <em>"How to implement rainwater harvesting?"</em></div>', unsafe_allow_html=True)
     for msg in st.session_state.chat_history:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    if prompt := st.chat_input("Ask about recommendations... e.g., 'Why solar panels?'"):
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        response = process_chat_message(prompt, st.session_state.campus_profile, st.session_state.recommendations)
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
-        with st.chat_message("assistant"):
-            st.markdown(response)
+        with st.chat_message(msg["role"]): st.markdown(msg["content"])
+    if prompt := st.chat_input("Ask about any recommendation..."):
+        st.session_state.chat_history.append({"role":"user","content":prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+        resp = process_chat_message(prompt, st.session_state.campus_profile, st.session_state.recommendations)
+        st.session_state.chat_history.append({"role":"assistant","content":resp})
+        with st.chat_message("assistant"): st.markdown(resp)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    with col_a:
-        if st.button("← Back", key="back_3", use_container_width=True):
-            go_to_step(2)
-            st.rerun()
-    with col_c:
-        if st.button("View Impact Analysis →", type="primary", key="next_3", use_container_width=True):
-            go_to_step(4)
-            st.rerun()
+    ca,_,cc = st.columns(3)
+    with ca:
+        if st.button("← Back", key="b3", use_container_width=True): go_to(2); st.rerun()
+    with cc:
+        if st.button("View Impact Analysis →", type="primary", key="n3", use_container_width=True): go_to(4); st.rerun()
 
-
-# ============================================================
-# STEP 4: IMPACT ANALYSIS
-# ============================================================
 def render_step4():
-    render_progress_bar(4)
-    st.markdown('<div class="section-header">📈 Impact Analysis</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subheader">Projected savings and environmental impact from recommended solutions</div>', unsafe_allow_html=True)
-
-    metrics = st.session_state.impact_metrics
-
-    # Metric cards
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.markdown(f"""
-        <div class="metric-card metric-green">
-            <div class="metric-icon">💰</div>
-            <div class="metric-value">₹{metrics['cost_savings']:,.0f}</div>
-            <div class="metric-label">Annual Savings</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"""
-        <div class="metric-card metric-blue">
-            <div class="metric-icon">⚡</div>
-            <div class="metric-value">{metrics['energy_savings']}%</div>
-            <div class="metric-label">Energy Savings</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c3:
-        st.markdown(f"""
-        <div class="metric-card metric-teal">
-            <div class="metric-icon">💧</div>
-            <div class="metric-value">{metrics['water_savings']}%</div>
-            <div class="metric-label">Water Savings</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with c4:
-        st.markdown(f"""
-        <div class="metric-card metric-orange">
-            <div class="metric-icon">🌍</div>
-            <div class="metric-value">{metrics['co2_reduction']}%</div>
-            <div class="metric-label">CO₂ Reduction</div>
-        </div>
-        """, unsafe_allow_html=True)
+    nav(); progress(4)
+    st.markdown('<div class="page-header"><div class="green-line"></div><h2>📈 Impact Analysis</h2><p>Projected financial & environmental benefits from your recommended solutions.</p></div>', unsafe_allow_html=True)
+    m = st.session_state.impact_metrics
+    c1,c2,c3,c4 = st.columns(4)
+    cards_m = [
+        (c1,"metric-green","💰",f"₹{m['cost_savings']:,.0f}","Annual Savings"),
+        (c2,"metric-blue","⚡",f"{m['energy_savings']}%","Energy Savings"),
+        (c3,"metric-teal","💧",f"{m['water_savings']}%","Water Savings"),
+        (c4,"metric-amber","🌍",f"{m['co2_reduction']}%","CO₂ Reduction"),
+    ]
+    for col,cls,icon,val,label in cards_m:
+        with col:
+            st.markdown(f"""
+            <div class="metric-card {cls} anim-up">
+              <div class="metric-icon-wrap">{icon}</div>
+              <div class="metric-value">{val}</div>
+              <div class="metric-label">{label}</div>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Charts
-    tab1, tab2, tab3 = st.tabs(["📊 Savings Breakdown", "🍩 Impact Distribution", "📈 5-Year Projection"])
-
-    with tab1:
-        breakdown = metrics.get("breakdown", [])
-        titles = [b["title"] for b in breakdown]
-        savings = [b["annual_savings"] for b in breakdown]
-        fig = go.Figure(go.Bar(
-            x=savings, y=titles, orientation='h',
-            marker=dict(color=savings, colorscale=[[0, '#A5D6A7'], [1, '#1B5E20']]),
-            text=[f"₹{s:,.0f}" for s in savings], textposition='auto',
-        ))
-        fig.update_layout(
-            title="Annual Savings by Recommendation",
-            xaxis_title="Annual Savings (₹)",
-            height=400, margin=dict(l=20, r=20, t=50, b=20),
-            font=dict(family="Inter"), plot_bgcolor='rgba(0,0,0,0)',
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    with tab2:
-        cat_dist = metrics.get("category_distribution", {})
-        fig2 = go.Figure(go.Pie(
-            labels=list(cat_dist.keys()), values=list(cat_dist.values()),
-            hole=0.5,
-            marker=dict(colors=['#2E7D32', '#1976D2', '#FF9800', '#00796B']),
-            textinfo='label+percent',
-        ))
-        fig2.update_layout(
-            title="Savings Distribution by Category",
-            height=400, font=dict(family="Inter"),
-        )
-        st.plotly_chart(fig2, use_container_width=True)
-
-    with tab3:
-        timeline = metrics.get("timeline", [])
-        years = [t["year"] for t in timeline]
-        annual = [t["annual_savings"] for t in timeline]
-        cumulative = [t["cumulative_savings"] for t in timeline]
-        fig3 = go.Figure()
-        fig3.add_trace(go.Bar(x=years, y=annual, name="Annual Savings", marker_color='#A5D6A7'))
-        fig3.add_trace(go.Scatter(x=years, y=cumulative, name="Cumulative Savings", line=dict(color='#2E7D32', width=3), mode='lines+markers'))
-        fig3.update_layout(
-            title="5-Year Projected Savings",
-            yaxis_title="Amount (₹)", height=400,
-            font=dict(family="Inter"), plot_bgcolor='rgba(0,0,0,0)',
-            legend=dict(orientation="h", yanchor="bottom", y=1.02),
-        )
-        st.plotly_chart(fig3, use_container_width=True)
+    t1,t2,t3 = st.tabs(["📊 Savings Breakdown","🍩 Impact Distribution","📈 5-Year Projection"])
+    bd = m.get("breakdown",[])
+    with t1:
+        titles=[b["title"] for b in bd]; vals=[b["annual_savings"] for b in bd]
+        fig=go.Figure(go.Bar(x=vals,y=titles,orientation='h',
+            marker=dict(color=vals,colorscale=[[0,'#bbf7d0'],[1,'#14532d']]),
+            text=[f"₹{v:,.0f}" for v in vals],textposition='auto'))
+        fig.update_layout(title="Annual Savings per Recommendation",xaxis_title="₹ Savings",
+            height=380,font=dict(family="Inter"),plot_bgcolor='rgba(0,0,0,0)',paper_bgcolor='rgba(0,0,0,0)')
+        fig.update_xaxes(showgrid=True,gridcolor='#f1f5f9')
+        st.plotly_chart(fig,use_container_width=True)
+    with t2:
+        cd=m.get("category_distribution",{})
+        fig2=go.Figure(go.Pie(labels=list(cd.keys()),values=list(cd.values()),hole=0.55,
+            marker=dict(colors=['#16a34a','#0ea5e9','#d97706','#0d9488']),textinfo='label+percent'))
+        fig2.update_layout(title="Category Distribution",height=380,font=dict(family="Inter"))
+        st.plotly_chart(fig2,use_container_width=True)
+    with t3:
+        tl=m.get("timeline",[])
+        yrs=[t["year"] for t in tl]; ann=[t["annual_savings"] for t in tl]; cum=[t["cumulative_savings"] for t in tl]
+        fig3=go.Figure()
+        fig3.add_trace(go.Bar(x=yrs,y=ann,name="Annual Savings",marker_color='#bbf7d0',marker_line_color='#16a34a',marker_line_width=1.5))
+        fig3.add_trace(go.Scatter(x=yrs,y=cum,name="Cumulative",line=dict(color='#16a34a',width=3),mode='lines+markers',
+            marker=dict(size=8,color='white',line=dict(color='#16a34a',width=2))))
+        fig3.update_layout(title="5-Year Savings Projection",yaxis_title="₹ Amount",height=380,
+            font=dict(family="Inter"),plot_bgcolor='rgba(0,0,0,0)',legend=dict(orientation="h",yanchor="bottom",y=1.02))
+        fig3.update_xaxes(showgrid=False); fig3.update_yaxes(showgrid=True,gridcolor='#f1f5f9')
+        st.plotly_chart(fig3,use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    with col_a:
-        if st.button("← Back to Dashboard", key="back_4", use_container_width=True):
-            go_to_step(3)
-            st.rerun()
-    with col_c:
-        if st.button("Generate Report →", type="primary", key="next_4", use_container_width=True):
-            go_to_step(5)
-            st.rerun()
+    ca,_,cc = st.columns(3)
+    with ca:
+        if st.button("← Back to Dashboard", key="b4", use_container_width=True): go_to(3); st.rerun()
+    with cc:
+        if st.button("Generate PDF Report →", type="primary", key="n4", use_container_width=True): go_to(5); st.rerun()
 
-
-# ============================================================
-# STEP 5: REPORT
-# ============================================================
 def render_step5():
-    render_progress_bar(5)
-    st.markdown('<div class="section-header">📄 Sustainability Report</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subheader">Download your comprehensive sustainability assessment report</div>', unsafe_allow_html=True)
-
-    profile = st.session_state.campus_profile
-    score = st.session_state.sustainability_score
-    recs = st.session_state.recommendations
-    metrics = st.session_state.impact_metrics
-    priorities = st.session_state.priorities
-
-    # Report preview
+    nav(); progress(5)
+    st.markdown('<div class="page-header"><div class="green-line"></div><h2>📄 Your Sustainability Report</h2><p>Download your complete AI-generated sustainability roadmap.</p></div>', unsafe_allow_html=True)
+    p=st.session_state.campus_profile; score=st.session_state.sustainability_score
+    recs=st.session_state.recommendations; m=st.session_state.impact_metrics
+    rec_items=''.join(f'<p style="margin:4px 0;">• <strong>{r["title"]}</strong> <span style="color:#6b7280;font-size:0.85rem;">— {r.get("priority","")}</span></p>' for r in recs[:5])
     st.markdown(f"""
-    <div class="report-preview">
-        <div class="report-header">
-            <h2 style="color:#2E7D32; margin:0;">CampusGreenify</h2>
-            <h3 style="color:#1A1A2E; margin:0.5rem 0;">Sustainability Assessment Report</h3>
-            <p style="color:#5A6070;">{profile.get('name', 'Campus')}</p>
-        </div>
-        <div class="report-section">
-            <h3>📋 Campus Profile</h3>
-            <p><strong>Type:</strong> {profile.get('type', 'N/A').replace('_', ' ').title()} &nbsp;|&nbsp;
-            <strong>Location:</strong> {profile.get('location', 'N/A').title()} &nbsp;|&nbsp;
-            <strong>Size:</strong> {profile.get('size', 'N/A')}</p>
-            <p><strong>Goal:</strong> {profile.get('main_goal', 'N/A')}</p>
-        </div>
-        <div class="report-section">
-            <h3>📊 Sustainability Score: <span style="color:#2E7D32;">{score}/100</span></h3>
-        </div>
-        <div class="report-section">
-            <h3>🎯 Top Recommendations</h3>
-            {''.join(f'<p>• <strong>{r["title"]}</strong> — {r.get("priority", "")}</p>' for r in recs[:5])}
-        </div>
-        <div class="report-section">
-            <h3>📈 Impact Summary</h3>
-            <p>💰 Annual Savings: <strong>₹{metrics["cost_savings"]:,.0f}</strong> &nbsp;|&nbsp;
-            ⚡ Energy: <strong>{metrics["energy_savings"]}%</strong> &nbsp;|&nbsp;
-            💧 Water: <strong>{metrics["water_savings"]}%</strong> &nbsp;|&nbsp;
-            🌍 CO₂: <strong>{metrics["co2_reduction"]}%</strong></p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    <div class="report-preview anim-up">
+      <div class="report-header">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">🌿</div>
+        <h2 style="color:#16a34a;margin:0;font-size:1.5rem;">CampusGreenify</h2>
+        <h3 style="color:#0f172a;margin:6px 0;font-weight:600;">Sustainability Assessment Report</h3>
+        <p style="color:#64748b;margin:0;">{p.get('name','Campus')}</p>
+      </div>
+      <div class="report-section">
+        <h3>📋 Campus Profile</h3>
+        <p style="color:#475569;font-size:0.9rem;margin:0;">
+          <strong>Type:</strong> {p.get('type','N/A').replace('_',' ').title()} &nbsp;|&nbsp;
+          <strong>Climate:</strong> {p.get('location','N/A').title()} &nbsp;|&nbsp;
+          <strong>Size:</strong> {p.get('size','N/A')} &nbsp;|&nbsp;
+          <strong>Goal:</strong> {p.get('main_goal','N/A')}
+        </p>
+      </div>
+      <div class="report-section">
+        <h3>📊 Sustainability Score: <span style="color:#16a34a;font-size:1.4rem;">{score}/100</span></h3>
+      </div>
+      <div class="report-section"><h3>🎯 Top Recommendations</h3>{rec_items}</div>
+      <div class="report-section">
+        <h3>📈 Projected Impact</h3>
+        <p style="color:#475569;font-size:0.9rem;margin:0;">
+          💰 <strong>₹{m['cost_savings']:,.0f}</strong>/yr savings &nbsp;|&nbsp;
+          ⚡ <strong>{m['energy_savings']}%</strong> energy &nbsp;|&nbsp;
+          💧 <strong>{m['water_savings']}%</strong> water &nbsp;|&nbsp;
+          🌍 <strong>{m['co2_reduction']}%</strong> CO₂
+        </p>
+      </div>
+    </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Generate PDF
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    with col_b:
-        pdf_bytes = generate_pdf_report(profile, priorities, recs, score, metrics)
-        campus_name_safe = profile.get("name", "campus").replace(" ", "_")
-        st.download_button(
-            label="📥  Download Full PDF Report",
-            data=pdf_bytes,
-            file_name=f"CampusGreenify_{campus_name_safe}_Report.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            type="primary",
-        )
+    _,cb,_ = st.columns([1,1,1])
+    with cb:
+        pdf = generate_pdf_report(p, st.session_state.priorities, recs, score, m)
+        fn = f"CampusGreenify_{p.get('name','campus').replace(' ','_')}_Report.pdf"
+        st.download_button("📥  Download Full PDF Report", data=pdf, file_name=fn,
+                           mime="application/pdf", use_container_width=True, type="primary")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    col_a2, col_b2, col_c2 = st.columns([1, 1, 1])
-    with col_a2:
-        if st.button("← Back to Impact Analysis", key="back_5", use_container_width=True):
-            go_to_step(4)
+    ca,_,cc = st.columns(3)
+    with ca:
+        if st.button("← Back", key="b5", use_container_width=True): go_to(4); st.rerun()
+    with cc:
+        if st.button("🔄 New Assessment", key="restart", use_container_width=True):
+            for k in list(st.session_state.keys()): del st.session_state[k]
             st.rerun()
-    with col_c2:
-        if st.button("🔄 Start New Assessment", key="restart", use_container_width=True):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
+    st.markdown('<div class="app-footer"><strong>CampusGreenify</strong> · AI-Powered Sustainability Intelligence · Making campuses greener, one decision at a time 🌿</div>', unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align:center; color:#5A6070; font-size:0.85rem; padding:1rem;">
-        <strong>CampusGreenify</strong> — AI-Powered Sustainability Intelligence for Campuses<br/>
-        Making campuses greener, one decision at a time. 🌿
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ============================================================
-# MAIN ROUTER
-# ============================================================
-def main():
-    step = st.session_state.current_step
-    if step == 0:
-        render_landing()
-    elif step == 1:
-        render_step1()
-    elif step == 2:
-        render_step2()
-    elif step == 3:
-        render_step3()
-    elif step == 4:
-        render_step4()
-    elif step == 5:
-        render_step5()
-
-
-if __name__ == "__main__":
-    main()
-else:
-    main()
+STEPS = {0:render_landing, 1:render_step1, 2:render_step2, 3:render_step3, 4:render_step4, 5:render_step5}
+STEPS[st.session_state.current_step]()
